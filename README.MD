@@ -20,7 +20,7 @@ Vite
 ESLint
 
 ## Ссылка на проект
-https://github.com/LesanePC/shfe-diplom.git
+https://lesanepc.github.io/shfe-diplom/
 
 ## Вход для admin page
 -login: shfe-diplom@netology.ru
