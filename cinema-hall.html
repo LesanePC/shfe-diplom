@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Выбор мест: Идёмвкино</title>
+  <link rel="stylesheet" href="./css/style.css">
+  <link rel="icon" href="favicon.ico">
+</head>
+
+<body>
+  <div class="container">
+    <header class="page-header">
+      <h1 class="logo"><a class="logo__link" href="index.html">Идём<span class="logo__highlight">в</span>кино</a></h1>
+    </header>
+
+    <main class="main-content booking">
+      <section class="booking__info">
+        <div class="booking__info_movie">
+          <h2 class="booking__info_title">Название фильма</h2>
+          <p class="booking__info_start">Начало сеанса: <span class="booking__info-time">00:00</span></p>
+          <p class="booking__info_hall">Зал</p>
+        </div>
+
+        <div class="booking__info_hint">
+          <img src="./img/seat.png" alt="Схема выбора мест" class="booking__info_hint-image">
+          <div class="booking__info_hint-text">Тапните дважды, чтобы увеличить</div>
+        </div>
+      </section>
+
+      <div class="booking__scheme">
+        <div class="booking__scheme_wrapper">
+          <div class="booking__scheme_places">
+          </div>
+        </div>
+
+        <div class="booking__scheme_legend">
+          <div class="booking__scheme_prices">
+            <p class="booking__scheme_legend-text"><span class="booking__scheme_legend-chair chair_standart"></span>
+              Свободно (<span class="price_standart"></span>руб)</p>
+            <p class="booking__scheme_legend-text"><span class="booking__scheme_legend-chair chair_vip"></span> Свободно
+              VIP (<span class="price_vip"></span>руб)</p>
+          </div>
+
+          <div class="booking__scheme_info">
+            <p class="booking__scheme_legend-text"><span class="booking__scheme_legend-chair chair_occupied"></span>
+              Занято</p>
+            <p class="booking__scheme_legend-text"><span class="booking__scheme_legend-chair chair_selected"></span>
+              Выбрано</p>
+          </div>
+        </div>
+      </div>
+
+      <button class="booking__button btn booking__button_disabled">Забронировать</button>
+
+    </main>
+  </div>
+
+  <script src="./js/cinema-hall.js"></script>
+</body>
+
+</html>

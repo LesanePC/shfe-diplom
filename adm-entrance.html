@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Авторизация: Идёмвкино</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<body>
+  <div class="admin">
+    <header class="page-header admin__header">
+      <h1 class="logo">Идём<span class="logo__highlight">в</span>кино</h1>
+      <p class="admin__subtitle">Администраторррская</p>
+    </header>
+    <main class="login__main">
+      <div class="login__main_header">
+        <h2 class="login__main_header-text">Авторизация</h2>
+      </div>
+      <form class="login__form">
+        <label class="login__label">
+          <span class="label__text">E-mail</span>
+          <input type="email" name="login" class="login__input login__email" placeholder="mail@adress.com" required>
+        </label>
+        <label class="login__label">
+          <span class="label__text">Пароль</span>
+          <input type="password" name="password" class="login__input login__password" required>
+        </label>
+        <button type="submit" class="login__button btn">Авторизоваться</button>
+      </form>
+    </main>
+  </div>
+  <script src="./js/adm-entrance.js"></script>
+</body>
+
+</html>

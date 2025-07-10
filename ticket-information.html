@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Электронный билет: Идёмвкино</title>
+
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<body>
+  <div class="container">
+    <header class="page-header">
+      <h1 class="logo"><a class="logo__link" href="index.html">Идём<span class="logo__highlight">в</span>кино</a></h1>
+    </header>
+
+    <main class="main-content">
+      <div class="payment__header">
+        <h2 class="payment__header-text">Электронный билет</h2>
+      </div>
+
+      <div class="payment__info-wrapper">
+        <div class="payment__info">
+          <p class="payment__info-text">На фильм: <span class="payment__info-movie payment__info-bold">Название
+              фильма</span></p>
+          <p class="payment__info-text">Ряд/Место: <span class="payment__info-places payment__info-bold"></span></p>
+          <p class="payment__info-text">В зале: <span class="payment__info-hall payment__info-bold">Название зала</span>
+          </p>
+          <p class="payment__info-text">Начало сеанса: <span class="payment__info-time payment__info-bold">Время</span>
+          </p>
+        </div>
+
+        <div class="payment__info-qr"></div>
+
+        <div class="payment__hint">
+          <p class="payment__hint-text">Приятного просмотра!</p>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <script src="./js/ticket-information.js"></script>
+  <script src="./js/QRCreator.js"></script>
+</body>
+
+</html>
