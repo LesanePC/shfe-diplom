@@ -2,6 +2,7 @@
 
 * {
   box-sizing: border-box;
+
 }
 
 p {
@@ -32,6 +33,7 @@ body {
   font-style: normal;
   font-weight: 400;
   color: #000000;
+  
 }
 
 .container {
@@ -51,6 +53,19 @@ body {
   line-height: 39px;
   text-transform: uppercase;
   color: #FFFFFF;
+}
+
+.cart-container {
+  display: none;
+}
+
+.cart-container.visible {
+  display: block; /* или flex, если нужно */
+}
+
+.cart--highlight {
+  outline: 2px dashed #16A6AF;
+  background-color: rgba(21, 166, 175, 0.1);
 }
 
 .logo__link {
@@ -280,6 +295,7 @@ body {
   width: 100%;
   padding-bottom: 30px;
   background: rgba(241, 235, 230, 0.95);
+  
 }
 
 .booking__info {
@@ -379,6 +395,7 @@ body {
 
 .booking__scheme_chair:not(.no-chair, .chair_occupied):hover {
   box-shadow: 0px 0px 4px #ffffff;
+  
 }
 
 .chair_standart {
@@ -395,6 +412,7 @@ body {
 
 .chair_occupied {
   border: 1px #525252 solid;
+  
 }
 
 .chair_selected {
@@ -403,12 +421,14 @@ body {
   box-shadow: 0px 0px 4px #16A6AF;
   transform: scale(1.2);
   cursor: pointer;
+  
 }
 
 .booking__scheme_legend {
   display: flex;
   flex-wrap: wrap;
   padding-top: 30px;
+  
 }
 
 .booking__scheme_prices {
@@ -430,6 +450,7 @@ body {
   display: inline-block;
   vertical-align: middle;
   cursor: default;
+  
 }
 
 .booking__button {
@@ -448,6 +469,7 @@ body {
 
 .booking__button_disabled:hover {
   box-shadow: 0px 0px 3px 0px rgba(0, 0, 0, 0.12), 0px 3px 3px 0px rgba(0, 0, 0, 0.24);
+  
 }
 
 /* Payment for tickets */

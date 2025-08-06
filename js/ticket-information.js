@@ -31,31 +31,45 @@ function parseTicketDetails(tickets) {
   const costs = [];
   tickets.forEach(ticket => {
     places.push(`${ticket.row}/${ticket.place}`);
-    costs.push(Number(ticket.price) || 0); 
+    // Используем поле coast согласно спецификации
+    const priceValue = Number(ticket.coast ?? ticket.price) || 0;
+    costs.push(priceValue);
   });
   return { places, costs };
 }
 
 function updateUI(film, hall, seance, places) {
-  filmInfoElement.textContent = film.film_name;
-  hallInfoElement.textContent = hall.hall_name;
-  timeInfoElement.textContent = seance.seance_time;
+  if (!filmInfoElement || !hallInfoElement || !timeInfoElement || !placesInfoElement) {
+    console.error("Некоторые DOM-элементы не найдены.");
+    return;
+  }
+
+  filmInfoElement.textContent = film.film_name || "";
+  hallInfoElement.textContent = hall.hall_name || "";
+  timeInfoElement.textContent = seance.seance_time || "";
   placesInfoElement.textContent = places.join(", ");
 }
 
 function generateQRCode(date, time, filmName, hallName, places, totalCost) {
+  if (!qrCodeDisplay) {
+    console.error("Элемент для отображения QR-кода не найден.");
+    return;
+  }
+
+  const totalCostFormatted = totalCost.toFixed(2);
+
   const qrText = [
-  `Дата: ${date}`,
-  `Время: ${time}`,
-  `Название фильма: ${filmName}`,
-  `Зал: ${hallName}`,
-  `Ряд/Место: ${places.join(", ")}`,
-  `Стоимость: ${totalCost}`,
-  `Билет действителен строго на свой сеанс`
-].join('\n');
+    `Дата: ${date}`,
+    `Время: ${time}`,
+    `Название фильма: ${filmName}`,
+    `Зал: ${hallName}`,
+    `Ряд/Место: ${places.join(", ")}`,
+    `Стоимость: ${totalCostFormatted} руб.`,
+    `Билет действителен строго на свой сеанс`
+  ].join('\n');
 
   if (typeof QRCreator === 'undefined') {
-    console.error("QRCreator library is not loaded.");
+    console.error("Библиотека QRCreator не загружена.");
     return;
   }
 
@@ -74,8 +88,8 @@ function generateQRCode(date, time, filmName, hallName, places, totalCost) {
 }
 
 async function initializePaymentPage() {
-  if (!checkedDate || !seanceId || tickets.length === 0) {
-    console.error("Missing required data in localStorage. Redirecting to home.");
+  if (!checkedDate || isNaN(seanceId) || tickets.length === 0) {
+    console.error("Отсутствуют необходимые данные в localStorage. Перенаправление на главную.");
     alert("Отсутствуют данные о билете. Пожалуйста, начните сначала.");
     window.location.href = "index.html";
     return;
@@ -91,13 +105,15 @@ async function initializePaymentPage() {
   const currentHall = findById(halls, currentSeance?.seance_hallid);
 
   if (!currentSeance || !currentFilm || !currentHall) {
-    console.error("Could not find complete seance, film, or hall info.");
+    console.error("Не удалось найти полную информацию о сеансе, фильме или зале.");
     alert("Не удалось найти полную информацию о сеансе. Пожалуйста, попробуйте снова.");
     return;
   }
 
   const { places, costs } = parseTicketDetails(tickets);
+
   const totalCost = costs.reduce((acc, price) => acc + price, 0);
+  
 
   updateUI(currentFilm, currentHall, currentSeance, places);
   generateQRCode(
@@ -109,6 +125,7 @@ async function initializePaymentPage() {
     totalCost
   );
 
+  // Очистка localStorage после отрисовки
   localStorage.removeItem("checkedDate");
   localStorage.removeItem("seanceId");
   localStorage.removeItem("tickets");

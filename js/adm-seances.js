@@ -12,16 +12,28 @@ let draggedElement = null;
 let deletedSessions = new Set();
 let sessionData = null;
 let initializedSubmitHandler = false;
+let isDeletionMode = false;
+
+let dragAndDropHandlersInitialized = false;
 
 async function initSessionsInterface(data) {
   sessionData = data;
+
   renderTimelines(data.result.halls);
   loadSessions(data);
-  setupDragAndDrop();
+  setSessionBackgrounds();
+  positionSessions();
+  bindDeleteSessionHandlers();
+
+  if (!dragAndDropHandlersInitialized) {
+    setupDragAndDropDelegation();
+    dragAndDropHandlersInitialized = true;
+  }
+
   setupAddSessionForm();
   setupDeleteSessionPopup();
   setupControlButtons();
-  updateControlButtonsState();
+  updateControlButtonsState(false);
 }
 
 function renderTimelines(halls) {
@@ -30,7 +42,7 @@ function renderTimelines(halls) {
     const section = document.createElement("section");
     section.classList.add("movie-seances__timeline");
     section.innerHTML = `
-      <div class="session-timeline__delete" data-hallid="${hall.id}">
+      <div class="session-timeline__delete" data-hallid="${hall.id}" title="Удалить сеанс">
         <img src="./img/trash.png" alt="Удалить сеанс">
       </div>
       <h3 class="timeline__hall_title">${hall.hall_name}</h3>
@@ -91,6 +103,8 @@ function positionSessions() {
     if (!timeElem) return;
 
     const [hours, minutes] = timeElem.textContent.split(":").map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return;
+
     const startMinutes = hours * 60 + minutes;
     const duration = Number(timeElem.dataset.duration);
 
@@ -113,34 +127,39 @@ function positionSessions() {
   });
 }
 
-function setupDragAndDrop() {
-  const sessions = document.querySelectorAll(".timeline__seances_movie");
-  const timelines = document.querySelectorAll(".timeline__seances");
-
-  sessions.forEach(session => {
-    session.addEventListener("dragstart", e => {
-      draggedElement = e.currentTarget;
-      e.dataTransfer.effectAllowed = "move";
-    });
-    session.addEventListener("dragend", () => {
-      draggedElement = null;
-    });
+function setupDragAndDropDelegation() {
+  timelinesWrapper.addEventListener("dragstart", event => {
+    const target = event.target.closest(".timeline__seances_movie");
+    if (!target) return;
+    draggedElement = target;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", target.dataset.seanceid || "");
   });
 
-  timelines.forEach(timeline => {
-    timeline.addEventListener("dragover", e => e.preventDefault());
-    timeline.addEventListener("drop", e => {
-      e.preventDefault();
-      if (!draggedElement) return;
+  timelinesWrapper.addEventListener("dragend", () => {
+    draggedElement = null;
+  });
 
-      const targetHallId = Number(timeline.dataset.id);
-      const draggedHallId = Number(draggedElement.parentElement.dataset.id);
+  timelinesWrapper.addEventListener("dragover", event => {
+    if (!event.target.closest(".timeline__seances")) return;
+    event.preventDefault();
+  });
 
-      if (targetHallId !== draggedHallId) {
-        timeline.appendChild(draggedElement);
-        updateControlButtonsState(true);
-      }
-    });
+  timelinesWrapper.addEventListener("drop", event => {
+    event.preventDefault();
+    if (!draggedElement) return;
+
+    const timeline = event.target.closest(".timeline__seances");
+    if (!timeline) return;
+    const targetHallId = Number(timeline.dataset.id);
+    const draggedHallId = Number(draggedElement.parentElement.dataset.id);
+
+    if (targetHallId !== draggedHallId) {
+      timeline.appendChild(draggedElement);
+      updateControlButtonsState(true);
+      positionSessions();
+      setSessionBackgrounds();
+    }
   });
 }
 
@@ -192,7 +211,18 @@ function validateNewSession() {
     return false;
   }
 
-  const [hours, minutes] = time.split(":").map(Number);
+  const timeParts = time.split(":").map(Number);
+  if (timeParts.length !== 2 || timeParts.some(isNaN)) {
+    alert("Некорректный формат времени. Используйте HH:mm.");
+    return false;
+  }
+
+  const [hours, minutes] = timeParts;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    alert("Некорректное время. Используйте часы 00-23 и минуты 00-59.");
+    return false;
+  }
+
   const startMinutes = hours * 60 + minutes;
   const endMinutes = startMinutes + filmDuration;
 
@@ -216,6 +246,7 @@ function validateNewSession() {
       return false;
     }
   }
+
   return true;
 }
 
@@ -240,7 +271,6 @@ function addNewSession() {
   timeline.insertAdjacentHTML("beforeend", newSessionHTML);
   positionSessions();
   setSessionBackgrounds();
-  setupDragAndDrop();
 }
 
 function setupDeleteSessionPopup() {
@@ -253,19 +283,36 @@ function bindDeleteSessionHandlers() {
   const deleteIcons = timelinesWrapper.querySelectorAll(".session-timeline__delete img");
   deleteIcons.forEach(icon => {
     icon.onclick = () => {
+      if (isDeletionMode) return;
       const hallId = icon.parentElement.dataset.hallid;
       const timeline = document.querySelector(`.timeline__seances[data-id="${hallId}"]`);
       if (!timeline) return;
 
-      timeline.classList.add("deletion-mode");
-      timeline.onclick = event => {
-        const target = event.target.closest(".timeline__seances_movie");
-        if (target) {
-          confirmDeleteSession(target);
-        }
-      };
+      enterDeletionMode(timeline);
     };
   });
+}
+
+function enterDeletionMode(timeline) {
+  isDeletionMode = true;
+  timeline.classList.add("deletion-mode");
+  timeline.addEventListener("click", onTimelineClickDelete);
+}
+
+function exitDeletionMode() {
+  isDeletionMode = false;
+  const timelines = document.querySelectorAll(".timeline__seances");
+  timelines.forEach(tl => {
+    tl.classList.remove("deletion-mode");
+    tl.removeEventListener("click", onTimelineClickDelete);
+  });
+}
+
+function onTimelineClickDelete(event) {
+  const target = event.target.closest(".timeline__seances_movie");
+  if (target) {
+    confirmDeleteSession(target);
+  }
 }
 
 function confirmDeleteSession(sessionElement) {
@@ -294,11 +341,7 @@ function confirmDeleteSession(sessionElement) {
     popupRemoveSession.classList.add("popup--hidden");
     btnDelete.removeEventListener("click", onDelete);
     btnCancel.removeEventListener("click", onCancel);
-    const timelines = document.querySelectorAll(".timeline__seances");
-    timelines.forEach(tl => {
-      tl.classList.remove("deletion-mode");
-      tl.onclick = null;
-    });
+    exitDeletionMode();
   }
 
   btnDelete.addEventListener("click", onDelete);
@@ -307,54 +350,62 @@ function confirmDeleteSession(sessionElement) {
 
 function setupControlButtons() {
   btnCancelSessions.addEventListener("click", () => {
-    if (btnCancelSessions.classList.contains("button--disabled")) return;
+    if (btnCancelSessions.disabled) return;
     reloadSessions();
   });
 
   btnSaveSessions.addEventListener("click", async (e) => {
     e.preventDefault();
-    if (btnSaveSessions.classList.contains("button--disabled")) return;
+    if (btnSaveSessions.disabled) return;
     await saveSessions();
   });
 }
 
 function updateControlButtonsState(enabled = false) {
   [btnCancelSessions, btnSaveSessions].forEach(btn => {
+    btn.disabled = !enabled;
     btn.classList.toggle("button--disabled", !enabled);
   });
 }
 
 async function reloadSessions() {
+  const scrollTop = timelinesWrapper.scrollTop;
   const data = await fetchSessionsData();
   if (data) {
     deletedSessions.clear();
     initSessionsInterface(data);
+    timelinesWrapper.scrollTop = scrollTop;
+    updateControlButtonsState(false);
   }
 }
 
 async function saveSessions() {
   const newSessions = getNewSessions();
-  await Promise.all(newSessions.map(s => addSessionToServer(s)));
 
-  await Promise.all(Array.from(deletedSessions).map(id => deleteSessionFromServer(id)));
+  try {
+    await Promise.all(newSessions.map(s => addSessionToServer(s)));
 
-  alert("Сеансы успешно сохранены!");
-  deletedSessions.clear();
-  updateControlButtonsState(false);
-  await reloadSessions();
+    await Promise.all(Array.from(deletedSessions).map(id => deleteSessionFromServer(id)));
+
+    alert("Сеансы успешно сохранены!");
+    deletedSessions.clear();
+    updateControlButtonsState(false);
+    await reloadSessions();
+  } catch (error) {
+    alert("Ошибка при сохранении сеансов. Попробуйте позже.");
+    console.error(error);
+  }
 }
 
 function getNewSessions() {
   const sessions = document.querySelectorAll(".timeline__seances_movie");
   return Array.from(sessions)
     .filter(s => s.dataset.seanceid === "")
-    .map(s => {
-      return {
-        hallId: s.parentElement.dataset.id,
-        filmId: s.dataset.filmid,
-        time: s.querySelector(".timeline__movie_start").textContent
-      };
-    });
+    .map(s => ({
+      hallId: s.parentElement.dataset.id,
+      filmId: s.dataset.filmid,
+      time: s.querySelector(".timeline__movie_start").textContent
+    }));
 }
 
 async function addSessionToServer(session) {
@@ -363,28 +414,24 @@ async function addSessionToServer(session) {
   params.set("seanceFilmid", session.filmId);
   params.set("seanceTime", session.time);
 
-  try {
-    const response = await fetch("https://shfe-diplom.neto-server.ru/seance", {
-      method: "POST",
-      body: params,
-    });
-    const data = await response.json();
-    console.log("Добавлен сеанс:", data);
-  } catch (error) {
-    console.error("Ошибка при добавлении сеанса:", error);
-  }
+  const response = await fetch("https://shfe-diplom.neto-server.ru/seance", {
+    method: "POST",
+    body: params,
+  });
+
+  if (!response.ok) throw new Error(`Ошибка при добавлении сеанса: ${response.status}`);
+  const data = await response.json();
+  console.log("Добавлен сеанс:", data);
 }
 
 async function deleteSessionFromServer(seanceId) {
-  try {
-    const response = await fetch(`https://shfe-diplom.neto-server.ru/seance/${seanceId}`, {
-      method: "DELETE",
-    });
-    const data = await response.json();
-    console.log("Удалён сеанс:", data);
-  } catch (error) {
-    console.error("Ошибка при удалении сеанса:", error);
-  }
+  const response = await fetch(`https://shfe-diplom.neto-server.ru/seance/${seanceId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) throw new Error(`Ошибка при удалении сеанса: ${response.status}`);
+  const data = await response.json();
+  console.log("Удалён сеанс:", data);
 }
 
 async function fetchSessionsData() {

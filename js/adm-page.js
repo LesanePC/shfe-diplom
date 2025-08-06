@@ -28,8 +28,7 @@ async function fetchData(callHandlers = true) {
     const data = await response.json();
 
     updateHallsUI(data);
-    operaciiFilmov(data);
-    operaciiSeansov(data);
+
   } catch (error) {
     console.error("Ошибка при загрузке данных:", error);
     return null;

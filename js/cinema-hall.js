@@ -1,11 +1,12 @@
-const seansId = Number(localStorage.getItem("seanceId"));
+const seanceId = Number(localStorage.getItem("seanceId"));
 const checkedDate = localStorage.getItem("checkedDate");
 const fullBody = document.querySelector("body");
+
 const filmNameElement = document.querySelector(".booking__info_title");
 const timeSeansElement = document.querySelector(".booking__info-time");
 const hallNameElement = document.querySelector(".booking__info_hall");
 const schemeContainer = document.querySelector(".booking__scheme_places");
-const priceStandartElement = document.querySelector(".price_standart");
+const priceStandardElement = document.querySelector(".price_standart");
 const priceVipElement = document.querySelector(".price_vip");
 const purchaseButton = document.querySelector(".booking__button");
 
@@ -14,60 +15,59 @@ let vipPrice = 0;
 let selectedTickets = [];
 
 function handleBodyScale() {
+  if (!fullBody) return;
+
   const currentWidth = fullBody.getBoundingClientRect().width;
+
   if (currentWidth < 1200) {
-    fullBody.classList.toggle("transformed");
-    if (fullBody.classList.contains("transformed")) {
+    if (!fullBody.classList.contains("transformed")) {
+      fullBody.classList.add("transformed");
       fullBody.style.transform = "scale(1.5)";
       fullBody.style.transformOrigin = "0 0";
-    } else {
-      fullBody.style.transform = "scale(1)";
-      fullBody.style.transformOrigin = "";
     }
   } else {
-    fullBody.classList.remove("transformed");
-    fullBody.style.transform = "";
-    fullBody.style.transformOrigin = "";
+    if (fullBody.classList.contains("transformed")) {
+      fullBody.classList.remove("transformed");
+      fullBody.style.transform = "";
+      fullBody.style.transformOrigin = "";
+    }
   }
 }
 
-function updateSessionInfo(data) {
-  const {
-    films,
-    seances,
-    halls
-  } = data.result;
+window.addEventListener("resize", handleBodyScale);
+handleBodyScale();
 
-  const currentSeance = seances.find(({
-    id
-  }) => id === seansId);
+function updateSessionInfo(data) {
+  if (!data?.result) return;
+
+  const { films, seances, halls } = data.result;
+
+  const currentSeance = seances.find(({ id }) => id === seanceId);
   if (!currentSeance) {
-    console.error(`Сеанс с ID ${seansId} не найден.`);
+    console.error(`Сеанс с ID ${seanceId} не найден.`);
+    alert("Сеанс не найден. Пожалуйста, выберите снова.");
     return;
   }
 
-  const currentFilm = films.find(({
-    id
-  }) => id === currentSeance.seance_filmid);
-  const currentHall = halls.find(({
-    id
-  }) => id === currentSeance.seance_hallid);
+  const currentFilm = films.find(({ id }) => id === currentSeance.seance_filmid);
+  const currentHall = halls.find(({ id }) => id === currentSeance.seance_hallid);
 
-  if (currentFilm) {
-    filmNameElement.textContent = currentFilm.film_name;
-  }
-  timeSeansElement.textContent = currentSeance.seance_time;
+  if (currentFilm) filmNameElement.textContent = currentFilm.film_name || "";
+  timeSeansElement.textContent = currentSeance.seance_time || "";
+
   if (currentHall) {
-    hallNameElement.textContent = currentHall.hall_name;
-    standardPrice = currentHall.hall_price_standart;
-    vipPrice = currentHall.hall_price_vip;
+    hallNameElement.textContent = currentHall.hall_name || "";
+    standardPrice = Number(currentHall.hall_price_standart) || 0;
+    vipPrice = Number(currentHall.hall_price_vip) || 0;
 
-    priceStandartElement.textContent = standardPrice;
+    priceStandardElement.textContent = standardPrice;
     priceVipElement.textContent = vipPrice;
   }
 }
 
 function renderHallScheme(hallConfig) {
+  if (!schemeContainer) return;
+
   schemeContainer.innerHTML = "";
   const fragment = document.createDocumentFragment();
 
@@ -93,21 +93,27 @@ function renderHallScheme(hallConfig) {
         default:
           chairElement.classList.add("no-chair");
       }
+
       rowElement.appendChild(chairElement);
     });
+
     fragment.appendChild(rowElement);
   });
+
   schemeContainer.appendChild(fragment);
 }
 
 function setupSeatSelection() {
+  if (!schemeContainer) return;
+
   schemeContainer.addEventListener("click", event => {
     const clickedElement = event.target;
 
     if (
       clickedElement.classList.contains("booking__scheme_chair") &&
       clickedElement.dataset.type !== "disabled" &&
-      clickedElement.dataset.type !== "taken"
+      clickedElement.dataset.type !== "taken" &&
+      clickedElement.dataset.type !== "no-chair"
     ) {
       clickedElement.classList.toggle("chair_selected");
       updatePurchaseButtonState();
@@ -116,30 +122,34 @@ function setupSeatSelection() {
 }
 
 function updatePurchaseButtonState() {
+  if (!purchaseButton) return;
+
   const selectedChairs = document.querySelectorAll(".booking__scheme_chair.chair_selected");
   purchaseButton.classList.toggle("booking__button_disabled", selectedChairs.length === 0);
 }
 
 function handlePurchaseButtonClick() {
+  if (!purchaseButton) return;
+
   purchaseButton.addEventListener("click", () => {
-    if (purchaseButton.classList.contains("booking__button_disabled")) {
-      return;
-    }
+    if (purchaseButton.classList.contains("booking__button_disabled")) return;
 
     selectedTickets = [];
     const rows = document.querySelectorAll(".booking__scheme_row");
 
     rows.forEach((row, rowIndex) => {
-      Array.from(row.children).forEach((chair, chairIndex) => {
+      Array.from(row.children).forEach((chair, seatIndex) => {
         if (chair.classList.contains("chair_selected")) {
           const seatType = chair.dataset.type;
           const price = seatType === "standart" ? standardPrice : vipPrice;
 
+          let correctedType = seatType === "standart" ? "standard" : seatType;
+
           selectedTickets.push({
             row: rowIndex + 1,
-            place: chairIndex + 1,
-            price: price,
-            type: seatType
+            place: seatIndex + 1,
+            coast: Number(price),
+            type: correctedType
           });
         }
       });
@@ -169,7 +179,7 @@ async function fetchData(url) {
 }
 
 async function initializeBookingPage() {
-  if (!seansId || !checkedDate) {
+  if (!seanceId || !checkedDate) {
     alert("Не выбраны сеанс или дата. Пожалуйста, вернитесь на главную страницу.");
     document.location.href = "index.html";
     return;
@@ -181,7 +191,7 @@ async function initializeBookingPage() {
   updateSessionInfo(allData);
 
   const hallConfigData = await fetchData(
-    `https://shfe-diplom.neto-server.ru/hallconfig?seanceId=${seansId}&date=${checkedDate}`
+    `https://shfe-diplom.neto-server.ru/hallconfig?seanceId=${seanceId}&date=${checkedDate}`
   );
   if (!hallConfigData) return;
 
@@ -193,11 +203,8 @@ async function initializeBookingPage() {
     return;
   }
 
-
-  fullBody.addEventListener("click", handleBodyScale);
   setupSeatSelection();
   handlePurchaseButtonClick();
-
   updatePurchaseButtonState();
 }
 
