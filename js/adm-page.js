@@ -24,17 +24,27 @@ document.querySelectorAll(".popup").forEach((popupElement) => {
 
 async function fetchData(callHandlers = true) {
   try {
-    const response = await fetch("https://shfe-diplom.neto-server.ru/alldata");
-    const data = await response.json();
-
-    updateHallsUI(data);
-
+    const savedData = localStorage.getItem("allDataCache");
+    if (!savedData) {
+      console.warn("Данные в localStorage отсутствуют");
+      return null;
+    }
+    const parsedData = JSON.parse(savedData);
+    console.log("Данные получены из localStorage");
+    if (callHandlers) updateHallsUI(parsedData);
+    return parsedData;
   } catch (error) {
-    console.error("Ошибка при загрузке данных:", error);
+    console.error("Ошибка при работе с localStorage:", error);
     return null;
   }
 }
 
+
 (async () => {
   await fetchData();
 })();
+
+function clearCache() {
+  localStorage.removeItem("allDataCache");
+  console.log("Кэш localStorage очищен");
+}

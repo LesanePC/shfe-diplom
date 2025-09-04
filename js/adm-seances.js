@@ -9,12 +9,64 @@ const btnCancelSessions = document.getElementById("btn-sessions-cancel");
 const btnSaveSessions = document.getElementById("btn-sessions-save");
 
 let draggedElement = null;
-let deletedSessions = new Set();
+let draggedFilmId = null;
 let sessionData = null;
+let originalParent = null;
+let originalNextSibling = null;
 let initializedSubmitHandler = false;
+let deletedSessions = new Set();
+let dragAndDropHandlersInitialized = false;
 let isDeletionMode = false;
 
-let dragAndDropHandlersInitialized = false;
+
+function setupAddSessionForm() {
+  fillSelectOptions();
+
+  if (!initializedSubmitHandler) {
+    initializedSubmitHandler = true;
+
+    formAddSession.addEventListener("submit", e => {
+      e.preventDefault();
+
+      if (validateNewSession()) {
+        if (draggedElement) {
+          draggedElement.querySelector('.timeline__movie_start').textContent = inputSessionTime.value;
+          const duration = selectSessionMovie.options[selectSessionMovie.selectedIndex].dataset.duration;
+          draggedElement.querySelector('.timeline__movie_start').dataset.duration = duration;
+          draggedElement.dataset.seanceid = `temp-${Date.now()}`;
+          draggedElement = null;
+        }
+        popupAddSession.classList.add("popup--hidden");
+        updateControlButtonsState(true);
+        positionSessions();
+        setSessionBackgrounds();
+      }
+    });
+  }
+}
+
+async function fetchSessionsData() {
+  try {
+    const savedData = localStorage.getItem('sessionsData');
+    if (savedData) {
+      const parsedData = JSON.parse(savedData);
+      if (parsedData && parsedData.result && parsedData.result.halls && parsedData.result.films) {
+        console.log('Данные сессий загружены из localStorage');
+        return parsedData;
+      }
+    }
+    const response = await fetch("https://shfe-diplom.neto-server.ru/alldata");
+    if (!response.ok) throw new Error(`Ошибка сети: ${response.status}`);
+    const data = await response.json();
+    localStorage.setItem('sessionsData', JSON.stringify(data));
+    console.log('Данные сессий загружены с сервера и сохранены в localStorage');
+    return data;
+  } catch (error) {
+    console.error("Ошибка при загрузке данных:", error);
+    alert("Не удалось загрузить данные. Попробуйте позже.");
+    return null;
+  }
+}
 
 async function initSessionsInterface(data) {
   sessionData = data;
@@ -128,56 +180,174 @@ function positionSessions() {
 }
 
 function setupDragAndDropDelegation() {
-  timelinesWrapper.addEventListener("dragstart", event => {
-    const target = event.target.closest(".timeline__seances_movie");
-    if (!target) return;
-    draggedElement = target;
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", target.dataset.seanceid || "");
+  const cart = document.querySelector('.cart-container');
+
+  // Сделать фильмы draggable и передавать filmId при dragstart
+  document.querySelectorAll('.movie-item').forEach(movie => {
+    movie.setAttribute('draggable', 'true');
+    movie.addEventListener('dragstart', e => {
+      const filmId = movie.dataset.id;
+      e.dataTransfer.setData('text/plain', filmId);
+      draggedFilmId = filmId;
+    });
   });
 
-  timelinesWrapper.addEventListener("dragend", () => {
+  // Drag and drop фильмы в таймлайн (создаем новый сеанс)
+  document.querySelectorAll('.timeline__seances').forEach(timeline => {
+    timeline.addEventListener('dragover', e => e.preventDefault());
+    timeline.addEventListener('drop', e => {
+      e.preventDefault();
+      const filmId = e.dataTransfer.getData('text/plain');
+      if (!filmId) return;
+
+      const movieData = sessionData.result.films.find(f => String(f.id) === filmId);
+      if (!movieData) return;
+
+      const seanceDiv = document.createElement('div');
+      seanceDiv.className = 'timeline__seances_movie';
+      seanceDiv.setAttribute('draggable', 'true');
+      seanceDiv.dataset.filmid = filmId;
+      seanceDiv.dataset.seanceid = `temp-${Date.now()}`;
+      seanceDiv.innerHTML = `
+        <p class="timeline__seances_title">${movieData.film_name}</p>
+        <p class="timeline__movie_start" data-duration="${movieData.film_duration}"></p>
+      `;
+      timeline.appendChild(seanceDiv);
+
+      // Открываем попап с редактированием данных сеанса
+      popupAddSession.classList.remove('popup--hidden');
+      selectSessionMovie.value = filmId;
+      selectSessionHall.value = timeline.dataset.id;
+      inputSessionTime.value = '';
+
+      draggedElement = seanceDiv;
+    });
+  });
+
+  // Переменные для dragged элемента и его окружения
+let draggedElement = null;
+let originalParent = null;
+let originalNextSibling = null;
+
+// Обработчики dragstart и dragend на timelinesWrapper для сеансов
+timelinesWrapper.addEventListener('dragstart', event => {
+  const target = event.target.closest('.timeline__seances_movie');
+  if (!target) return;
+
+  draggedElement = target;
+  originalParent = target.parentElement;
+  originalNextSibling = target.nextElementSibling;
+  const seanceId = target.dataset.seanceid;
+  console.log('dragstart seanceId:', seanceId);
+
+  const timelineSection = target.closest('.movie-seances__timeline');
+  const deleteBox = timelineSection?.querySelector('.session-timeline__delete');
+  if (deleteBox) {
+    deleteBox.classList.add('visible');
+  }
+
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', seanceId || '');
+});
+
+timelinesWrapper.addEventListener('dragend', () => {
+  document.querySelectorAll('.session-timeline__delete.visible').forEach(deleteBox => {
+    deleteBox.classList.remove('visible');
+  });
+  draggedElement = null;
+});
+
+// Разрешение drop на самой секции таймлайна
+timelinesWrapper.addEventListener('dragover', event => {
+  if (event.target.closest('.timeline__seances')) {
+    event.preventDefault();
+  }
+});
+
+// Drop и перемещение сеанса между залами с вызовом попапа
+timelinesWrapper.addEventListener('drop', event => {
+  event.preventDefault();
+  const targetTimeline = event.target.closest('.timeline__seances');
+  if (!targetTimeline || !draggedElement) return;
+
+  const targetHallId = Number(targetTimeline.dataset.id);
+  const draggedHallId = Number(draggedElement.parentElement.dataset.id);
+
+  if (targetHallId !== draggedHallId) {
+    draggedElement.dataset.targetHallId = targetHallId;
+
+    popupAddSession.classList.remove('popup--hidden');
+    selectSessionHall.value = targetHallId;
+    selectSessionMovie.value = draggedElement.dataset.filmid;
+    inputSessionTime.value = '';
+
+  }
+});
+
+// Настройка корзины удаления сеансов
+document.querySelectorAll('.session-timeline__delete').forEach(deleteBox => {
+  deleteBox.addEventListener('dragenter', e => e.preventDefault());
+  deleteBox.addEventListener('dragover', e => {
+    e.preventDefault();
+    deleteBox.classList.add('dragover');
+  });
+  deleteBox.addEventListener('dragleave', e => {
+    deleteBox.classList.remove('dragover');
+  });
+  deleteBox.addEventListener('drop', e => {
+    e.preventDefault();
+    deleteBox.classList.remove('dragover');
+    deleteBox.classList.remove('visible');
+
+    const seanceId = e.dataTransfer.getData('text/plain');
+    console.log('Drop в корзину, seanceId:', seanceId);
+
+    if (!seanceId) {
+      console.warn('SeanceId не найден в событии drop');
+      return;
+    }
+
+    const elementToRemove = document.querySelector(`[data-seanceid="${seanceId}"]`);
+    if (elementToRemove) {
+      elementToRemove.remove();
+      alert("Сеанс удалён");
+      updateControlButtonsState(true);
+    } else {
+      console.warn('Элемент не найден для удаления');
+    }
+
     draggedElement = null;
   });
-
-  timelinesWrapper.addEventListener("dragover", event => {
-    if (!event.target.closest(".timeline__seances")) return;
-    event.preventDefault();
-  });
-
-  timelinesWrapper.addEventListener("drop", event => {
-    event.preventDefault();
-    if (!draggedElement) return;
-
-    const timeline = event.target.closest(".timeline__seances");
-    if (!timeline) return;
-    const targetHallId = Number(timeline.dataset.id);
-    const draggedHallId = Number(draggedElement.parentElement.dataset.id);
-
-    if (targetHallId !== draggedHallId) {
-      timeline.appendChild(draggedElement);
-      updateControlButtonsState(true);
-      positionSessions();
-      setSessionBackgrounds();
-    }
-  });
+});
 }
 
-function setupAddSessionForm() {
-  fillSelectOptions();
+formAddSession.addEventListener('submit', e => {
+  e.preventDefault();
+  if (!draggedElement) return;
 
-  if (!initializedSubmitHandler) {
-    initializedSubmitHandler = true;
-    formAddSession.addEventListener("submit", e => {
-      e.preventDefault();
-      if (validateNewSession()) {
-        addNewSession();
-        popupAddSession.classList.add("popup--hidden");
-        updateControlButtonsState(true);
+  if (validateNewSession()) {
+    const targetHallId = draggedElement.dataset.targetHallId;
+
+    if (targetHallId && Number(targetHallId) !== Number(draggedElement.parentElement.dataset.id)) {
+      const newParent = document.querySelector(`.timeline__seances[data-id="${targetHallId}"]`);
+      if (newParent) {
+        newParent.appendChild(draggedElement);
+        delete draggedElement.dataset.targetHallId;
       }
-    });
+    }
+
+    draggedElement.querySelector('.timeline__movie_start').textContent = inputSessionTime.value;
+    const duration = selectSessionMovie.options[selectSessionMovie.selectedIndex].dataset.duration;
+    draggedElement.querySelector('.timeline__movie_start').dataset.duration = duration;
+    draggedElement.dataset.seanceid = `temp-${Date.now()}`;
+
+    draggedElement = null;
+    popupAddSession.classList.add('popup--hidden');
+    updateControlButtonsState(true);
+    positionSessions();
+    setSessionBackgrounds();
   }
-}
+});
 
 function fillSelectOptions() {
   selectSessionHall.innerHTML = "";
@@ -189,7 +359,6 @@ function fillSelectOptions() {
     option.textContent = hall.hall_name;
     selectSessionHall.appendChild(option);
   });
-
   sessionData.result.films.forEach(film => {
     const option = document.createElement("option");
     option.value = film.id;
@@ -199,10 +368,14 @@ function fillSelectOptions() {
   });
 }
 
+function timeToMinutes(timeStr) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
 function validateNewSession() {
   const hallId = Number(selectSessionHall.value);
   const filmOption = selectSessionMovie.options[selectSessionMovie.selectedIndex];
-  const filmId = Number(filmOption.value);
   const filmDuration = Number(filmOption.dataset.duration);
   const time = inputSessionTime.value;
 
@@ -223,7 +396,7 @@ function validateNewSession() {
     return false;
   }
 
-  const startMinutes = hours * 60 + minutes;
+  const startMinutes = timeToMinutes(time);
   const endMinutes = startMinutes + filmDuration;
 
   if (endMinutes > 23 * 60 + 59) {
@@ -232,14 +405,22 @@ function validateNewSession() {
   }
 
   const timeline = document.querySelector(`.timeline__seances[data-id="${hallId}"]`);
-  const existingSessions = timeline ? timeline.querySelectorAll(".timeline__seances_movie") : [];
+  if (!timeline) return true;
 
+  const existingSessions = timeline.querySelectorAll(".timeline__seances_movie");
   for (const session of existingSessions) {
     const timeElem = session.querySelector(".timeline__movie_start");
-    const [sh, sm] = timeElem.textContent.split(":").map(Number);
-    const existingStart = sh * 60 + sm;
+    if (!timeElem) continue;
+
+    const timeText = timeElem.textContent.trim();
+    if (!timeText) continue;
+
+    const existingStart = timeToMinutes(timeText);
     const existingDuration = Number(timeElem.dataset.duration);
     const existingEnd = existingStart + existingDuration;
+
+    const draggedSeanceId = draggedElement ? draggedElement.dataset.seanceid : null;
+    if (session.dataset.seanceid === draggedSeanceId) continue;
 
     if (startMinutes < existingEnd && endMinutes > existingStart) {
       alert("Новый сеанс пересекается с существующим.");
@@ -249,6 +430,7 @@ function validateNewSession() {
 
   return true;
 }
+
 
 function addNewSession() {
   const hallId = selectSessionHall.value;
@@ -282,15 +464,16 @@ function setupDeleteSessionPopup() {
 function bindDeleteSessionHandlers() {
   const deleteIcons = timelinesWrapper.querySelectorAll(".session-timeline__delete img");
   deleteIcons.forEach(icon => {
-    icon.onclick = () => {
-      if (isDeletionMode) return;
-      const hallId = icon.parentElement.dataset.hallid;
-      const timeline = document.querySelector(`.timeline__seances[data-id="${hallId}"]`);
-      if (!timeline) return;
+  icon.addEventListener("click", () => {
+    if (isDeletionMode) return;
+    const hallId = icon.parentElement.dataset.hallid;
+    const timeline = document.querySelector(`.timeline__seances[data-id="${hallId}"]`);
+    if (!timeline) return;
 
-      enterDeletionMode(timeline);
-    };
+    enterDeletionMode(timeline);
   });
+});
+
 }
 
 function enterDeletionMode(timeline) {
@@ -322,12 +505,20 @@ function confirmDeleteSession(sessionElement) {
 
   popupRemoveSession.classList.remove("popup--hidden");
 
+  const cart = document.querySelector('.cart-container');
+  if (cart) {
+    cart.classList.remove('visible');
+    cart.style.display = 'none';
+  }
+
   const btnDelete = popupRemoveSession.querySelector(".popup__remove-seance_button_delete");
   const btnCancel = popupRemoveSession.querySelector(".popup__button_cancel");
 
   const onDelete = () => {
-    const seanceId = sessionElement.dataset.seanceid;
-    if (seanceId) deletedSessions.add(seanceId);
+    if (cart) {
+      cart.classList.remove("visible");
+      cart.style.display = "none";
+    }
     sessionElement.remove();
     updateControlButtonsState(true);
     cleanup();
@@ -346,6 +537,41 @@ function confirmDeleteSession(sessionElement) {
 
   btnDelete.addEventListener("click", onDelete);
   btnCancel.addEventListener("click", onCancel);
+}
+
+function collectSessionsPositions() {
+  const sessions = document.querySelectorAll(".timeline__seances_movie");
+  return Array.from(sessions).map(session => ({
+    seanceId: session.dataset.seanceid,
+    hallId: session.parentElement.dataset.id,
+    startTime: session.querySelector('.timeline__movie_start').textContent,
+    duration: session.querySelector('.timeline__movie_start').dataset.duration,
+  }));
+}
+
+async function saveSessions() {
+  const updatedSessions = collectSessionsPositions();
+
+  try {
+    const response = await fetch('https://shfe-diplom.neto-server.ru/film', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ sessions: updatedSessions }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ошибка сервера: ${response.status}`);
+    }
+
+    const result = await response.json();
+    alert("Сеансы успешно сохранены!");
+    await reloadSessions();
+  } catch (error) {
+    alert('Ошибка при сохранении сеансов. Попробуйте позже.');
+    console.error(error);
+  }
 }
 
 function setupControlButtons() {
@@ -376,73 +602,6 @@ async function reloadSessions() {
     initSessionsInterface(data);
     timelinesWrapper.scrollTop = scrollTop;
     updateControlButtonsState(false);
-  }
-}
-
-async function saveSessions() {
-  const newSessions = getNewSessions();
-
-  try {
-    await Promise.all(newSessions.map(s => addSessionToServer(s)));
-
-    await Promise.all(Array.from(deletedSessions).map(id => deleteSessionFromServer(id)));
-
-    alert("Сеансы успешно сохранены!");
-    deletedSessions.clear();
-    updateControlButtonsState(false);
-    await reloadSessions();
-  } catch (error) {
-    alert("Ошибка при сохранении сеансов. Попробуйте позже.");
-    console.error(error);
-  }
-}
-
-function getNewSessions() {
-  const sessions = document.querySelectorAll(".timeline__seances_movie");
-  return Array.from(sessions)
-    .filter(s => s.dataset.seanceid === "")
-    .map(s => ({
-      hallId: s.parentElement.dataset.id,
-      filmId: s.dataset.filmid,
-      time: s.querySelector(".timeline__movie_start").textContent
-    }));
-}
-
-async function addSessionToServer(session) {
-  const params = new FormData();
-  params.set("seanceHallid", session.hallId);
-  params.set("seanceFilmid", session.filmId);
-  params.set("seanceTime", session.time);
-
-  const response = await fetch("https://shfe-diplom.neto-server.ru/seance", {
-    method: "POST",
-    body: params,
-  });
-
-  if (!response.ok) throw new Error(`Ошибка при добавлении сеанса: ${response.status}`);
-  const data = await response.json();
-  console.log("Добавлен сеанс:", data);
-}
-
-async function deleteSessionFromServer(seanceId) {
-  const response = await fetch(`https://shfe-diplom.neto-server.ru/seance/${seanceId}`, {
-    method: "DELETE",
-  });
-
-  if (!response.ok) throw new Error(`Ошибка при удалении сеанса: ${response.status}`);
-  const data = await response.json();
-  console.log("Удалён сеанс:", data);
-}
-
-async function fetchSessionsData() {
-  try {
-    const response = await fetch("https://shfe-diplom.neto-server.ru/alldata");
-    if (!response.ok) throw new Error(`Ошибка сети: ${response.status}`);
-    return await response.json();
-  } catch (error) {
-    console.error("Ошибка при загрузке данных:", error);
-    alert("Не удалось загрузить данные. Попробуйте позже.");
-    return null;
   }
 }
 

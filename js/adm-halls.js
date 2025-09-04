@@ -72,24 +72,30 @@ const addHallInput = document.querySelector(".popup__input");
 const addHallConfirmButton = document.querySelector(".button--confirm");
 
 addHallForm.addEventListener("submit", async (e) => {
-	e.preventDefault();
-	submitAddHallForm(addHallInput);
-	const updatedData = await fetchData(false);
-	if (updatedData) updateHallsUI(updatedData);
-	location.reload();
+  e.preventDefault(); // Отменяем перезагрузку страницы
+
+  const hallName = addHallInput.value.trim();
+  if (!hallName) {
+    alert("Введите название зала");
+    return;
+  }
+
+  try {
+    const data = await sendHallData(hallName);
+    if (data && data.result && data.result.halls) {
+      updateHallsUI(data);
+      clearInput(addHallInput);
+      addHallPopup.classList.add("popup--hidden");
+    } else {
+      alert("Ошибка при добавлении зала");
+    }
+  } catch (error) {
+    console.error("Ошибка отправки данных:", error);
+    alert("Ошибка сервера, попробуйте позже");
+  }
 });
 
-function submitAddHallForm(inputField) {
-	const hallName = inputField.value.trim();
-	if (hallName) {
-		sendHallData(hallName).then((data) => {
-			if (data && data.result && data.result.halls) {
-				appendHallToList(data.result.halls.id, hallName);
-				clearInput(inputField);
-			}
-		});
-	}
-}
+
 
 async function sendHallData(hallName) {
 	const formData = new FormData();
@@ -99,11 +105,43 @@ async function sendHallData(hallName) {
 			method: "POST",
 			body: formData,
 		});
+
+		if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Ошибка сервера ${response.status}: ${errorText}`);
+      throw new Error(`Ошибка сервера ${response.status}`);
+    }
+
 		return response.json();
 	} catch (error) {
 		console.error("Ошибка при отправке данных:", error);
+		throw error;
 	}
 }
+
+addHallForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const hallName = addHallInput.value.trim();
+  if (!hallName) {
+    alert("Введите название зала");
+    return;
+  }
+
+  try {
+    const data = await sendHallData(hallName);
+    if (data && data.result && data.result.halls) {
+      updateHallsUI(data);
+      clearInput(addHallInput);
+      addHallPopup.classList.add("popup--hidden");
+    } else {
+      alert("Ошибка при добавлении зала: неверные данные");
+      console.error("Неверные данные от сервера:", data);
+    }
+  } catch (error) {
+    alert("Ошибка сервера, попробуйте позже.");
+  }
+});
 
 function appendHallToList(hallId, hallName) {
 	hallsList.insertAdjacentHTML(
@@ -412,10 +450,17 @@ function getHallOpenStatus(data, hallId) {
 }
 
 function countHallSeances(data, hallId) {
-	return data.result.seances.filter(
-		(seance) => seance.seance_hallid === Number(hallId)
-	).length;
+    const seances = data?.result?.seances;
+    if (!Array.isArray(seances)) {
+        console.error("Данные сеансов отсутствуют или имеют неверный формат");
+        return 0;
+    }
+    return seances.filter(
+        seance => seance.seance_hallid === Number(hallId)
+    ).length;
 }
+
+
 
 function updateSalesButtonAndInfo(status, seanceCount) {
 	if (status === 0 && seanceCount === 0) {
@@ -606,8 +651,8 @@ function updateHallsUI(data) {
 
 		const deleteSessionButtons = document.querySelectorAll(".session-timeline__delete");
 		deleteSessionButtons.forEach((btn) => btn.classList.add("hidden"));
+		
 	});
-
 	if (hallConfigList?.firstElementChild) {
 		const firstHallItem = hallConfigList.firstElementChild;
 

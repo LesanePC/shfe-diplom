@@ -56,12 +56,16 @@ body {
 }
 
 .cart-container {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
 
 .cart-container.visible {
-  display: block; /* или flex, если нужно */
+  opacity: 1;
+  pointer-events: auto;
 }
+
 
 .cart--highlight {
   outline: 2px dashed #16A6AF;
@@ -1307,24 +1311,29 @@ label {
 
 .movie-seances__timeline {
   position: relative;
+  
 }
 
 .session-timeline__delete {
+  opacity: 0;
+  pointer-events: none;
   position: absolute;
   left: -30px;
   top: 30px;
+  z-index: 1000;
+  transition: opacity 0.3s ease;
 }
+
+.session-timeline__delete.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 
 .session-timeline__delete img {
   width: 30px;
 }
 
-.session-timeline__title {
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 18px;
-  text-transform: uppercase;
-}
 
 .session-slots {
   position: relative;
