@@ -148,7 +148,7 @@ function handlePurchaseButtonClick() {
           selectedTickets.push({
             row: rowIndex + 1,
             place: seatIndex + 1,
-            coast: Number(price),
+            cost: Number(price),
             type: correctedType
           });
         }
