@@ -442,7 +442,7 @@ async function saveSessions() {
     deletedSessions.clear();
     updateControlButtonsState(false);
 
-    // Получаем обновленные данные с сервера и обновляем localStorage и интерфейс
+    // Получаем обновленные данные с сервера и обновляем localStorage
     const freshData = await fetchSessionsData();
     if (freshData) {
       updateSessionsInLocalStorage(freshData);

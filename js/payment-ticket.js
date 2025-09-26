@@ -65,7 +65,6 @@ ticketButton.addEventListener("click", async (e) => {
   ticketButton.textContent = "Отправка...";
 
   try {
-    // Валидация билетов
     for (const ticket of tickets) {
       if (
         typeof ticket.row !== "number" ||
@@ -79,7 +78,7 @@ ticketButton.addEventListener("click", async (e) => {
     const payload = {
   seanceId: seanceId,
   ticketDate: checkedDate,
-  tickets: tickets,  // просто массив объектов
+  tickets: tickets,
 };
 
 const response = await fetch("https://shfe-diplom.neto-server.ru/ticket", {

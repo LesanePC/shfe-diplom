@@ -1,6 +1,4 @@
-// Восстановление состояния раскрытия секций из localStorage
 document.querySelectorAll(".admin-section__toggle").forEach((toggleArrow, index) => {
-  // Восстанавливаем состояние из localStorage
   const isHidden = localStorage.getItem(`adminSectionHidden_${index}`) === "true";
   const sectionHeader = toggleArrow.closest(".admin-section__header");
   const contentWrapper = sectionHeader?.nextElementSibling;
@@ -15,18 +13,15 @@ document.querySelectorAll(".admin-section__toggle").forEach((toggleArrow, index)
     const isNowHidden = toggleArrow.classList.contains("admin__header_arrow-hide");
     contentWrapper?.classList.toggle("admin__wrapper-hide");
 
-    // Запоминаем состояние при клике
     localStorage.setItem(`adminSectionHidden_${index}`, isNowHidden.toString());
   };
 });
 
-// Обработка попапов с сохранением состояния не показан
 document.querySelectorAll(".popup").forEach((popupElement, index) => {
   const closeButton = popupElement.querySelector(".popup__close");
   const cancelButton = popupElement.querySelector(".button--cancel");
   const formElement = popupElement.querySelector(".popup__form");
 
-  // Восстановить состояние видимости попапа
   const isHidden = localStorage.getItem(`popupHidden_${index}`) === "true";
   if (isHidden) {
     popupElement.classList.add("popup--hidden");

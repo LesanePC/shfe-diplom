@@ -31,7 +31,6 @@ function parseTicketDetails(tickets) {
   const costs = [];
   tickets.forEach(ticket => {
     places.push(`${ticket.row}/${ticket.place}`);
-    // Используем поле coast согласно спецификации
     const priceValue = Number(ticket.coast ?? ticket.price) || 0;
     costs.push(priceValue);
   });
@@ -125,7 +124,6 @@ async function initializePaymentPage() {
     totalCost
   );
 
-  // Очистка localStorage после отрисовки
   localStorage.removeItem("checkedDate");
   localStorage.removeItem("seanceId");
   localStorage.removeItem("tickets");
