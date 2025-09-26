@@ -32,8 +32,8 @@ let priceConfigForm = document.querySelector(".price-config__form");
 const priceInputs = document.querySelectorAll(".price-config__input");
 let priceStandardInput = priceInputs[0];
 let priceVipInput = priceInputs[1];
-let priceConfigCancelButton = document.querySelector(".price-config__batton_cancel");
-let priceConfigSaveButton = document.querySelector(".price-config__batton_save");
+let priceConfigCancelButton = document.querySelector(".price-config__button_cancel");
+let priceConfigSaveButton = document.querySelector(".price-config__button_save");
 
 const salesSection = document.querySelector(".admin-section--sales");
 const salesList = document.querySelector(".sales__list");
@@ -72,30 +72,24 @@ const addHallInput = document.querySelector(".popup__input");
 const addHallConfirmButton = document.querySelector(".button--confirm");
 
 addHallForm.addEventListener("submit", async (e) => {
-  e.preventDefault(); // Отменяем перезагрузку страницы
-
-  const hallName = addHallInput.value.trim();
-  if (!hallName) {
-    alert("Введите название зала");
-    return;
-  }
-
-  try {
-    const data = await sendHallData(hallName);
-    if (data && data.result && data.result.halls) {
-      updateHallsUI(data);
-      clearInput(addHallInput);
-      addHallPopup.classList.add("popup--hidden");
-    } else {
-      alert("Ошибка при добавлении зала");
-    }
-  } catch (error) {
-    console.error("Ошибка отправки данных:", error);
-    alert("Ошибка сервера, попробуйте позже");
-  }
+	e.preventDefault();
+	submitAddHallForm(addHallInput);
+	const updatedData = await fetchData(false);
+	if (updatedData) updateHallsUI(updatedData);
+	location.reload();
 });
 
-
+function submitAddHallForm(inputField) {
+	const hallName = inputField.value.trim();
+	if (hallName) {
+		sendHallData(hallName).then((data) => {
+			if (data && data.result && data.result.halls) {
+				appendHallToList(data.result.halls.id, hallName);
+				clearInput(inputField);
+			}
+		});
+	}
+}
 
 async function sendHallData(hallName) {
 	const formData = new FormData();
@@ -105,43 +99,11 @@ async function sendHallData(hallName) {
 			method: "POST",
 			body: formData,
 		});
-
-		if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Ошибка сервера ${response.status}: ${errorText}`);
-      throw new Error(`Ошибка сервера ${response.status}`);
-    }
-
 		return response.json();
 	} catch (error) {
 		console.error("Ошибка при отправке данных:", error);
-		throw error;
 	}
 }
-
-addHallForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const hallName = addHallInput.value.trim();
-  if (!hallName) {
-    alert("Введите название зала");
-    return;
-  }
-
-  try {
-    const data = await sendHallData(hallName);
-    if (data && data.result && data.result.halls) {
-      updateHallsUI(data);
-      clearInput(addHallInput);
-      addHallPopup.classList.add("popup--hidden");
-    } else {
-      alert("Ошибка при добавлении зала: неверные данные");
-      console.error("Неверные данные от сервера:", data);
-    }
-  } catch (error) {
-    alert("Ошибка сервера, попробуйте позже.");
-  }
-});
 
 function appendHallToList(hallId, hallName) {
 	hallsList.insertAdjacentHTML(
@@ -450,17 +412,10 @@ function getHallOpenStatus(data, hallId) {
 }
 
 function countHallSeances(data, hallId) {
-    const seances = data?.result?.seances;
-    if (!Array.isArray(seances)) {
-        console.error("Данные сеансов отсутствуют или имеют неверный формат");
-        return 0;
-    }
-    return seances.filter(
-        seance => seance.seance_hallid === Number(hallId)
-    ).length;
+	return data.result.seances.filter(
+		(seance) => seance.seance_hallid === Number(hallId)
+	).length;
 }
-
-
 
 function updateSalesButtonAndInfo(status, seanceCount) {
 	if (status === 0 && seanceCount === 0) {
@@ -568,11 +523,6 @@ function clearUIBeforeRender() {
 }
 
 function updateHallsUI(data) {
-	const hallsData = data?.result?.halls ?? [];
-  if (hallsData.length === 0) {
-    console.error("Ошибка: отсутствуют данные halls или неверный формат", data);
-    return;
-  }
 	clearUIBeforeRender();
 	hallConfigForm = document.querySelector(".hall-config__form");
 
@@ -598,83 +548,88 @@ function updateHallsUI(data) {
 		return;
 	}
 
-	hallsData.forEach(hall => {
-    if (hallsList) {
-      const listItem = document.createElement("li");
-      listItem.className = "halls-list__item";
+	data.result.halls.forEach((hall) => {
+		if (hallsList) {
+			const listItem = document.createElement("li");
+			listItem.className = "halls-list__item";
 
-      const hallNameSpan = document.createElement("span");
-      hallNameSpan.className = "halls-list__name";
-      hallNameSpan.dataset.id = hall.id;
-      hallNameSpan.textContent = hall.hall_name;
+			const hallNameSpan = document.createElement("span");
+			hallNameSpan.className = "halls-list__name";
+			hallNameSpan.dataset.id = hall.id;
+			hallNameSpan.textContent = hall.hall_name;
 
-      const removeBtn = document.createElement("span");
-      removeBtn.className = "button--remove hall_remove";
+			const removeBtn = document.createElement("span");
+			removeBtn.className = "button--remove hall_remove";
 
-      listItem.appendChild(hallNameSpan);
-      listItem.appendChild(removeBtn);
+			listItem.appendChild(hallNameSpan);
+			listItem.appendChild(removeBtn);
 
-      hallsList.appendChild(listItem);
-    }
+			hallsList.appendChild(listItem);
+		}
 
 		updateVisibleSections();
 
 		if (hallConfigList) {
-      hallConfigList.insertAdjacentHTML(
-        "beforeend",
-        `<li class="hall__item hall-config__item" data-id="${hall.id}">${hall.hall_name}</li>`
-      );
-    }
+			hallConfigList.insertAdjacentHTML(
+				"beforeend",
+				`<li class="hall__item hall-config__item" data-id="${hall.id}">${hall.hall_name}</li>`
+			);
+		}
 
-    if (priceConfigList) {
-      priceConfigList.insertAdjacentHTML(
-        "beforeend",
-        `<li class="hall__item price-config__item" data-id="${hall.id}">${hall.hall_name}</li>`
-      );
-    }
+		if (priceConfigList) {
+			priceConfigList.insertAdjacentHTML(
+				"beforeend",
+				`<li class="hall__item price-config__item" data-id="${hall.id}">${hall.hall_name}</li>`
+			);
+		}
 
-    if (salesList) {
-      salesList.insertAdjacentHTML(
-        "beforeend",
-        `<li class="hall__item open__item" data-id="${hall.id}">${hall.hall_name}</li>`
-      );
-    }
+		if (salesList) {
+			salesList.insertAdjacentHTML(
+				"beforeend",
+				`<li class="hall__item open__item" data-id="${hall.id}">${hall.hall_name}</li>`
+			);
+		}
 
-	if (sessionsTimeline) {
-      sessionsTimeline.insertAdjacentHTML(
-        "beforeend",
-        `
+		sessionsTimeline.insertAdjacentHTML(
+			"beforeend",
+			`
       <section class="movie-seances__timeline">
         <div class="session-timeline__delete">
           <img src="./img/trash.png" alt="Удалить сеанс">
         </div>
         <h3 class="timeline__hall_title">${hall.hall_name}</h3>
-        <div class="timeline__seances" data-id="${hall.id}"></div>
+        <div class="timeline__seances" data-id="${hall.id}">
+        </div>
       </section>
       `
-      );
-    }
+		);
 
 		const deleteSessionButtons = document.querySelectorAll(".session-timeline__delete");
 		deleteSessionButtons.forEach((btn) => btn.classList.add("hidden"));
-		
 	});
+
 	if (hallConfigList?.firstElementChild) {
-    const firstHallItem = hallConfigList.firstElementChild;
-    firstHallItem.classList.add("hall_item-selected");
-    currentHallConfigId = firstHallItem.getAttribute("data-id");
-    currentHallConfigIndex = hallsData.findIndex(hall => hall.id === Number(currentHallConfigId));
+		const firstHallItem = hallConfigList.firstElementChild;
 
-    if (currentHallConfigIndex !== -1) {
-      const currentHall = hallsData[currentHallConfigIndex];
-      hallRowsInput.value = currentHall.hall_rows ?? "";
-      hallSeatsInput.value = currentHall.hall_places ?? "";
+		firstHallItem.classList.add("hall_item-selected");
 
-      displayHallConfig(data, currentHallConfigIndex);
-      enableSeatEditing(hallRowsElements, data);
-      enableHallSizeEditing(updatedHallConfigArray, data);
-    }
-  }
+		currentHallConfigId = firstHallItem.getAttribute("data-id");
+
+		currentHallConfigIndex = data.result.halls.findIndex(
+			(hall) => hall.id === Number(currentHallConfigId)
+		);
+
+		if (currentHallConfigIndex !== -1) {
+			const currentHall = data.result.halls[currentHallConfigIndex];
+
+			hallRowsInput.value = currentHall.hall_rows;
+			hallSeatsInput.value = currentHall.hall_places;
+
+			displayHallConfig(data, currentHallConfigIndex);
+			enableSeatEditing(hallRowsElements, data);
+			enableHallSizeEditing(updatedHallConfigArray, data);
+		}
+	}
 
 	if (hallConfigCancelButton) {
 		hallConfigCancelButton.addEventListener("click", (event) => {

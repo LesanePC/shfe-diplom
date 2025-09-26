@@ -37,7 +37,7 @@ function updateTicketInfo(data) {
   }
 
   const places = tickets.map(t => `${t.row}/${t.place}`);
-  const costs = tickets.map(t => Number(t.coast ?? t.price) || 0);
+  const costs = tickets.map(t => Number(t.price) || 0);
   const totalCost = costs.reduce((acc, val) => acc + val, 0);
 
   filmInfoElem.textContent = film.film_name;
@@ -65,20 +65,38 @@ ticketButton.addEventListener("click", async (e) => {
   ticketButton.textContent = "Отправка...";
 
   try {
-    const formData = new FormData();
-    formData.append("seanceId", seanceId);
-    formData.append("ticketDate", checkedDate);
-    formData.append("tickets", JSON.stringify(tickets));
+    // Валидация билетов
+    for (const ticket of tickets) {
+      if (
+        typeof ticket.row !== "number" ||
+        typeof ticket.place !== "number" ||
+        typeof ticket.price !== "number" ||
+        typeof ticket.type !== "string"
+      ) {
+        throw new Error(`Неверный формат билета: ${JSON.stringify(ticket)}`);
+      }
+    }
+    const payload = {
+  seanceId: seanceId,
+  ticketDate: checkedDate,
+  tickets: tickets,  // просто массив объектов
+};
 
-    const response = await fetch("https://shfe-diplom.neto-server.ru/ticket", {
-      method: "POST",
-      headers: {
-        "Accept": "application/json"
-      },
-      body: formData
-    });
+const response = await fetch("https://shfe-diplom.neto-server.ru/ticket", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  body: JSON.stringify(payload)
+});
 
-    if (!response.ok) throw new Error(`Ошибка сервера: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Ошибка с сервера:", errorText);
+      throw new Error(`Ошибка сервера: ${response.status}`);
+    }
 
     const result = await response.json();
 
@@ -86,12 +104,12 @@ ticketButton.addEventListener("click", async (e) => {
       localStorage.setItem("ticketsInfo", JSON.stringify(result));
       window.location.href = "./ticket-information.html";
     } else {
-      console.log("Ответ сервера (полный):", JSON.stringify(result, null, 2));
-      alert("Места недоступны для бронирования!");
+      console.error("Ответ сервера (полный):", JSON.stringify(result, null, 2));
+      alert("Места недоступны для бронирования или данные некорректны!");
     }
   } catch (error) {
+    alert(error.message);
     console.error("Ошибка при бронировании:", error);
-    alert("Произошла ошибка при бронировании. Попробуйте позже.");
   } finally {
     ticketButton.disabled = false;
     ticketButton.textContent = "Получить билет";
