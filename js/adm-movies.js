@@ -1,5 +1,4 @@
 window.sharedAllDataPromise = null;
-
 function getAllDataPromise() {
   if (window.sharedAllDataPromise) return window.sharedAllDataPromise;
   window.sharedAllDataPromise = fetch("https://shfe-diplom.neto-server.ru/alldata")

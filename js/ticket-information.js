@@ -99,7 +99,6 @@ async function initializePaymentPage() {
   if (!allData) return;
 
   const { films, seances, halls } = allData.result;
-
   const currentSeance = findById(seances, seanceId);
   const currentFilm = findById(films, currentSeance?.seance_filmid);
   const currentHall = findById(halls, currentSeance?.seance_hallid);

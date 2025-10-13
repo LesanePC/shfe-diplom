@@ -227,7 +227,7 @@ timelinesWrapper.addEventListener("drop", event => {
 
   if (deleteBin) {
     confirmDeleteSession(draggedElement);
-    draggedElement = null; // сброс
+    draggedElement = null;
     return;
   }
 

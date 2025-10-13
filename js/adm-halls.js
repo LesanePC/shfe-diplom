@@ -495,7 +495,6 @@ function clearUIBeforeRender() {
 	reinitializeElement(".hall-config__controls .button--save");
 	reinitializeElement(".price-config__controls .button--cancel");
 	reinitializeElement(".price-config__controls .button--save");
-
 	reinitializeElement(".button--open");
 
 	currentHallConfigId = null;
