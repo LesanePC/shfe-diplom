@@ -39,8 +39,6 @@ document.querySelectorAll(".popup").forEach((popupElement, index) => {
   });
 });
 
-// Интеграция общего кешированного промиса для данных allData
-
 window.sharedAllDataPromise = null;
 
 function getAllDataPromise() {

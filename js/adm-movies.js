@@ -1,4 +1,3 @@
-// --- Глобальный промис для загрузки allData ---
 window.sharedAllDataPromise = null;
 
 function getAllDataPromise() {
@@ -14,8 +13,6 @@ function getAllDataPromise() {
     });
   return window.sharedAllDataPromise;
 }
-
-// ---------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
   const addMovieBtn = document.querySelector(".button--add-movie");
@@ -206,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   async function refreshAllDataAndRender() {
-    window.sharedAllDataPromise = null; // Сбрасываем кеш
+    window.sharedAllDataPromise = null;
     const updatedData = await getAllDataPromise();
     if (updatedData) renderMovies(updatedData);
   }

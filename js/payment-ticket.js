@@ -14,7 +14,6 @@ if (isNaN(seanceId) || !checkedDate || tickets.length === 0) {
   window.location.href = "index.html";
 }
 
-// Обновление информации по билету
 function updateTicketInfo(data) {
   if (!data || !data.result) {
     alert("Не удалось загрузить данные для билета.");
@@ -48,7 +47,6 @@ function updateTicketInfo(data) {
   priceInfoElem.textContent = totalCost.toFixed(2);
 }
 
-// Умная функция debounce с контекстом и возобновлением вызова
 function debounce(func, wait = 500) {
   let timeout;
   return function(...args) {

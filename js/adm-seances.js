@@ -537,9 +537,9 @@ function updateSessionsInLocalStorage(updatedData) {
 document.addEventListener("DOMContentLoaded", async () => {
   await initSessionsInterface();
 });
-// Для принудительного обновления
+
 async function refreshSessionsData() {
   isInterfaceInitialized = false;
-  window.sharedAllDataPromise = null; // Сбрасываем кеш
+  window.sharedAllDataPromise = null;
   await initSessionsInterface(true);
 }
