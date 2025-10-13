@@ -1234,6 +1234,16 @@ label {
   height: 5px;
   background-color: #848484;
 }
+/* Обеспечение поддержки drag в Safari и Chrome */
+[draggable=true] {
+  -webkit-user-drag: element; /* для Safari и Chrome */
+  -khtml-user-drag: element;   /* для старых версий Safari */
+  -webkit-user-select: none;   /* запрещаем выделение текста в Webkit-браузерах */
+  -khtml-user-select: none;
+  -moz-user-select: none;      /* Firefox */
+  -ms-user-select: none;       /* IE/Edge */
+  user-select: none;           /* стандартное свойство */
+}
 
 .timeline__seances_title {
   height: 20px;

@@ -1,3 +1,22 @@
+// --- Глобальный промис для загрузки allData ---
+window.sharedAllDataPromise = null;
+
+function getAllDataPromise() {
+  if (window.sharedAllDataPromise) return window.sharedAllDataPromise;
+  window.sharedAllDataPromise = fetch("https://shfe-diplom.neto-server.ru/alldata")
+    .then(response => {
+      if (!response.ok) throw new Error("Ошибка сети: " + response.status);
+      return response.json();
+    })
+    .catch(error => {
+      alert("Не удалось загрузить данные. Попробуйте позже.");
+      throw error;
+    });
+  return window.sharedAllDataPromise;
+}
+
+// ---------------------------------------------------
+
 document.addEventListener("DOMContentLoaded", () => {
   const addMovieBtn = document.querySelector(".button--add-movie");
   const moviesContainer = document.querySelector(".movies-grid");
@@ -66,8 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data && data.id) {
         addMovieToList(data);
       } else {
-        const updatedData = await fetchData();
-        if (updatedData) renderMovies(updatedData);
+        await refreshAllDataAndRender();
       }
     } catch (error) {
       console.error("Ошибка при добавлении фильма:", error);
@@ -113,6 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const movieElem = moviesContainer.querySelector(`.movie-item[data-id="${movieId}"]`);
       if (movieElem) movieElem.remove();
 
+      await refreshAllDataAndRender();
     } catch (error) {
       console.error("Ошибка при удалении фильма:", error);
       alert("Не удалось удалить фильм. Попробуйте позже.");
@@ -121,12 +140,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const handleAddMovieFormSubmit = (e) => {
     e.preventDefault();
-
     if (!posterFile) {
       alert("Загрузите постер!");
       return;
     }
-
     addMovie();
   };
   formElements.addMovieForm?.addEventListener("submit", handleAddMovieFormSubmit);
@@ -188,22 +205,14 @@ document.addEventListener("DOMContentLoaded", () => {
     attachDragHandlers();
   };
 
-  async function fetchData() {
-    try {
-      const response = await fetch("https://shfe-diplom.neto-server.ru/alldata");
-      if (!response.ok) {
-        throw new Error(`Ошибка сети: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error("Ошибка при загрузке данных:", error);
-      alert("Не удалось загрузить данные. Попробуйте позже.");
-      return null;
-    }
+  async function refreshAllDataAndRender() {
+    window.sharedAllDataPromise = null; // Сбрасываем кеш
+    const updatedData = await getAllDataPromise();
+    if (updatedData) renderMovies(updatedData);
   }
 
   (async () => {
-    const initialData = await fetchData();
+    const initialData = await getAllDataPromise();
     if (initialData) renderMovies(initialData);
   })();
 

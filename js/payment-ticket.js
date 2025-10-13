@@ -14,6 +14,7 @@ if (isNaN(seanceId) || !checkedDate || tickets.length === 0) {
   window.location.href = "index.html";
 }
 
+// Обновление информации по билету
 function updateTicketInfo(data) {
   if (!data || !data.result) {
     alert("Не удалось загрузить данные для билета.");
@@ -37,7 +38,7 @@ function updateTicketInfo(data) {
   }
 
   const places = tickets.map(t => `${t.row}/${t.place}`);
-  const costs = tickets.map(t => Number(t.price) || 0);
+  const costs = tickets.map(t => Number(t.coast) || 0);
   const totalCost = costs.reduce((acc, val) => acc + val, 0);
 
   filmInfoElem.textContent = film.film_name;
@@ -45,6 +46,16 @@ function updateTicketInfo(data) {
   timeInfoElem.textContent = seance.seance_time;
   placesInfoElem.textContent = places.join(", ");
   priceInfoElem.textContent = totalCost.toFixed(2);
+}
+
+// Умная функция debounce с контекстом и возобновлением вызова
+function debounce(func, wait = 500) {
+  let timeout;
+  return function(...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), wait);
+  };
 }
 
 fetch("https://shfe-diplom.neto-server.ru/alldata")
@@ -58,9 +69,10 @@ fetch("https://shfe-diplom.neto-server.ru/alldata")
     alert("Не удалось загрузить данные. Попробуйте позже.");
   });
 
-ticketButton.addEventListener("click", async (e) => {
+const handleTicketClick = async (e) => {
   e.preventDefault();
 
+  if (ticketButton.disabled) return; 
   ticketButton.disabled = true;
   ticketButton.textContent = "Отправка...";
 
@@ -69,27 +81,26 @@ ticketButton.addEventListener("click", async (e) => {
       if (
         typeof ticket.row !== "number" ||
         typeof ticket.place !== "number" ||
-        typeof ticket.price !== "number" ||
+        typeof ticket.price !== "number" || 
         typeof ticket.type !== "string"
       ) {
         throw new Error(`Неверный формат билета: ${JSON.stringify(ticket)}`);
       }
     }
     const payload = {
-  seanceId: seanceId,
-  ticketDate: checkedDate,
-  tickets: tickets,
-};
+      seanceId,
+      ticketDate: checkedDate,
+      tickets,
+    };
 
-const response = await fetch("https://shfe-diplom.neto-server.ru/ticket", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Accept": "application/json"
-  },
-  body: JSON.stringify(payload)
-});
-
+    const response = await fetch("https://shfe-diplom.neto-server.ru/ticket", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -113,6 +124,8 @@ const response = await fetch("https://shfe-diplom.neto-server.ru/ticket", {
     ticketButton.disabled = false;
     ticketButton.textContent = "Получить билет";
   }
-});
+};
+
+ticketButton.addEventListener("click", debounce(handleTicketClick, 500));
 
 console.log("Содержимое tickets:", tickets);

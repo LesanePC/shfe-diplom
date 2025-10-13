@@ -39,13 +39,29 @@ document.querySelectorAll(".popup").forEach((popupElement, index) => {
   });
 });
 
-async function fetchData(callHandlers = true) {
+// Интеграция общего кешированного промиса для данных allData
+
+window.sharedAllDataPromise = null;
+
+function getAllDataPromise() {
+  if (window.sharedAllDataPromise) return window.sharedAllDataPromise;
+  window.sharedAllDataPromise = fetch("https://shfe-diplom.neto-server.ru/alldata")
+    .then(response => {
+      if (!response.ok) throw new Error("Ошибка сети: " + response.status);
+      return response.json();
+    })
+    .catch(error => {
+      alert("Не удалось загрузить данные. Попробуйте позже.");
+      throw error;
+    });
+  return window.sharedAllDataPromise;
+}
+
+async function fetchData() {
   try {
-    const response = await fetch("https://shfe-diplom.neto-server.ru/alldata");
-    const data = await response.json();
-
+    const data = await getAllDataPromise();
     updateHallsUI(data);
-
+    return data;
   } catch (error) {
     console.error("Ошибка при загрузке данных:", error);
     return null;

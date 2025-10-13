@@ -12,60 +12,61 @@ let draggedElement = null;
 let deletedSessions = new Set();
 let sessionData = null;
 let initializedSubmitHandler = false;
+let isInterfaceInitialized = false;
 let isDeletionMode = false;
 let dragAndDropHandlersInitialized = false;
 
 const localStorageSessionsKey = "sessionsData";
 
-async function fetchSessionsData() {
-  const cachedDataStr = localStorage.getItem(localStorageSessionsKey);
-  if (cachedDataStr) {
-    try {
-      const cachedData = JSON.parse(cachedDataStr);
-      console.log("Данные сеансов загружены из localStorage");
-      return cachedData;
-    } catch (e) {
-      console.warn("Ошибка парсинга sessionsData из localStorage", e);
-      localStorage.removeItem(localStorageSessionsKey);
+window.sharedAllDataPromise = null;
+
+function fetchSessionsData(forceUpdate = false) {
+  if (!forceUpdate && window.sharedAllDataPromise) {
+    return window.sharedAllDataPromise;
+  }
+
+  if (!forceUpdate) {
+    const cachedDataStr = localStorage.getItem(localStorageSessionsKey);
+    if (cachedDataStr) {
+      try {
+        const cachedData = JSON.parse(cachedDataStr);
+        console.log("Данные сеансов загружены из localStorage");
+        window.sharedAllDataPromise = Promise.resolve(cachedData);
+        return window.sharedAllDataPromise;
+      } catch (e) {
+        console.warn("Ошибка парсинга sessionsData из localStorage", e);
+        localStorage.removeItem(localStorageSessionsKey);
+      }
     }
   }
-  try {
-    const response = await fetch("https://shfe-diplom.neto-server.ru/alldata");
-    if (!response.ok) throw new Error(`Ошибка сети: ${response.status}`);
-    const data = await response.json();
 
-    localStorage.setItem(localStorageSessionsKey, JSON.stringify(data));
-    console.log("Данные сеансов загружены с сервера и сохранены в localStorage");
-    return data;
-  } catch (error) {
-    console.error("Ошибка при загрузке данных:", error);
-    alert("Не удалось загрузить данные. Попробуйте позже.");
-    return null;
-  }
+  window.sharedAllDataPromise = fetch("https://shfe-diplom.neto-server.ru/alldata")
+    .then(response => {
+      if (!response.ok) throw new Error(`Ошибка сети: ${response.status}`);
+      return response.json();
+    })
+    .then(data => {
+      localStorage.setItem(localStorageSessionsKey, JSON.stringify(data));
+      console.log("Данные сеансов загружены с сервера и сохранены в localStorage");
+      return data;
+    })
+    .catch(error => {
+      console.error("Ошибка при загрузке данных:", error);
+      alert("Не удалось загрузить данные. Попробуйте позже.");
+      throw error;
+    });
+
+  return window.sharedAllDataPromise;
 }
 
-function updateSessionsInLocalStorage(updatedData) {
-  try {
-    const currentDataStr = localStorage.getItem(localStorageSessionsKey);
-    let currentData = currentDataStr ? JSON.parse(currentDataStr) : null;
-
-    if (!currentData || !currentData.result) {
-      currentData = { result: { halls: [], films: [], seances: [] }, success: true };
-    }
-
-    currentData.result.halls = updatedData.result.halls;
-    currentData.result.films = updatedData.result.films;
-    currentData.result.seances = updatedData.result.seances;
-
-    localStorage.setItem(localStorageSessionsKey, JSON.stringify(currentData));
-    console.log("LocalStorage успешно обновлён");
-  } catch (e) {
-    console.error("Ошибка обновления localStorage:", e);
+async function initSessionsInterface(forceFetch = false) {
+  if (isInterfaceInitialized && !forceFetch) {
+    console.log("Интерфейс уже инициализирован, повторный вызов пропущен");
+    return;
   }
-}
+  isInterfaceInitialized = true;
 
-async function initSessionsInterface() {
-  const data = await fetchSessionsData();
+  const data = await fetchSessionsData(forceFetch);
   if (!data) return;
 
   sessionData = data;
@@ -88,6 +89,7 @@ async function initSessionsInterface() {
 }
 
 function renderTimelines(halls) {
+  console.log("renderTimelines старт. Очистка контейнера timelinesWrapper");
   timelinesWrapper.innerHTML = "";
   halls.forEach(hall => {
     const section = document.createElement("section");
@@ -101,22 +103,29 @@ function renderTimelines(halls) {
     `;
     timelinesWrapper.appendChild(section);
   });
+  console.log("renderTimelines завершено. Таймлайн отрисован");
 }
 
 function loadSessions(data) {
   const timelines = timelinesWrapper.querySelectorAll(".timeline__seances");
+  console.log("loadSessions: найдено таймлайнов:", timelines.length);
+
   timelines.forEach(timeline => {
-    timeline.innerHTML = "";
-    const hallId = Number(timeline.dataset.id);
-    const sessionsForHall = data.result.seances.filter(s => Number(s.seance_hallid) === hallId);
-    sessionsForHall.forEach(session => {
-      const film = data.result.films.find(f => f.id === Number(session.seance_filmid));
-      if (film) {
-        const sessionHTML = createSessionHTML(session, film);
-        timeline.insertAdjacentHTML("beforeend", sessionHTML);
-      }
-    });
+    const hallId = timeline.dataset.id;
+    const sessionsForHall = data.result.seances.filter(s => String(s.seance_hallid) === String(hallId));
+
+    let html = sessionsForHall
+      .map(session => {
+        const film = data.result.films.find(f => f.id === Number(session.seance_filmid));
+        return film ? createSessionHTML(session, film) : "";
+      })
+      .join("");
+
+    timeline.innerHTML = html;
+
+    console.log(`loadSessions: hallId ${hallId}, сессий: ${sessionsForHall.length}`);
   });
+
   setSessionBackgrounds();
   positionSessions();
   bindDeleteSessionHandlers();
@@ -164,7 +173,7 @@ function positionSessions() {
 
     Object.assign(session.style, {
       left: `${leftPercent}%`,
-      width: `${widthPercent}%`
+      width: `${widthPercent}%`,
     });
 
     const sessionWidthPx = session.getBoundingClientRect().width;
@@ -183,12 +192,21 @@ function setupDragAndDropDelegation() {
     const target = event.target.closest(".timeline__seances_movie");
     if (!target) return;
     draggedElement = target;
+    document.querySelectorAll(".session-timeline__delete").forEach(deleteIcon => {
+      deleteIcon.style.opacity = "1";
+      deleteIcon.style.pointerEvents = "auto";
+    });
+
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", target.dataset.seanceid || "");
   });
 
   timelinesWrapper.addEventListener("dragend", () => {
     draggedElement = null;
+    document.querySelectorAll(".session-timeline__delete").forEach(deleteIcon => {
+      deleteIcon.style.opacity = "0";
+      deleteIcon.style.pointerEvents = "none";
+    });
   });
 
   timelinesWrapper.addEventListener("dragover", event => {
@@ -196,22 +214,37 @@ function setupDragAndDropDelegation() {
     event.preventDefault();
   });
 
-  timelinesWrapper.addEventListener("drop", event => {
-    event.preventDefault();
-    if (!draggedElement) return;
+  timelinesWrapper.addEventListener("dragover", event => {
+  if (!event.target.closest(".timeline__seances") && !event.target.closest(".session-timeline__delete")) return;
+  event.preventDefault();
+});
 
-    const timeline = event.target.closest(".timeline__seances");
-    if (!timeline) return;
-    const targetHallId = Number(timeline.dataset.id);
-    const draggedHallId = Number(draggedElement.parentElement.dataset.id);
+timelinesWrapper.addEventListener("drop", event => {
+  event.preventDefault();
+  if (!draggedElement) return;
 
-    if (targetHallId !== draggedHallId) {
-      timeline.appendChild(draggedElement);
-      updateControlButtonsState(true);
-      positionSessions();
-      setSessionBackgrounds();
-    }
-  });
+  const deleteBin = event.target.closest(".session-timeline__delete");
+
+  if (deleteBin) {
+    confirmDeleteSession(draggedElement);
+    draggedElement = null; // сброс
+    return;
+  }
+
+  const timeline = event.target.closest(".timeline__seances");
+  if (!timeline) return;
+  const targetHallId = Number(timeline.dataset.id);
+  const draggedHallId = Number(draggedElement.parentElement.dataset.id);
+
+  if (targetHallId !== draggedHallId) {
+    timeline.appendChild(draggedElement);
+    updateControlButtonsState(true);
+    positionSessions();
+    setSessionBackgrounds();
+  }
+});
+
+
 }
 
 function setupAddSessionForm() {
@@ -405,7 +438,7 @@ function setupControlButtons() {
     reloadSessions();
   });
 
-  btnSaveSessions.addEventListener("click", async (e) => {
+  btnSaveSessions.addEventListener("click", async e => {
     e.preventDefault();
     if (btnSaveSessions.disabled) return;
     await saveSessions();
@@ -421,13 +454,11 @@ function updateControlButtonsState(enabled = false) {
 
 async function reloadSessions() {
   const scrollTop = timelinesWrapper.scrollTop;
-  const data = await fetchSessionsData();
-  if (data) {
-    deletedSessions.clear();
-    initSessionsInterface(data);
-    timelinesWrapper.scrollTop = scrollTop;
-    updateControlButtonsState(false);
-  }
+  deletedSessions.clear();
+  isInterfaceInitialized = false;
+  await initSessionsInterface(true);
+  timelinesWrapper.scrollTop = scrollTop;
+  updateControlButtonsState(false);
 }
 
 async function saveSessions() {
@@ -435,20 +466,17 @@ async function saveSessions() {
 
   try {
     await Promise.all(newSessions.map(s => addSessionToServer(s)));
-
     await Promise.all(Array.from(deletedSessions).map(id => deleteSessionFromServer(id)));
 
     alert("Сеансы успешно сохранены!");
     deletedSessions.clear();
     updateControlButtonsState(false);
 
-    // Получаем обновленные данные с сервера и обновляем localStorage
-    const freshData = await fetchSessionsData();
+    const freshData = await fetchSessionsData(true);
     if (freshData) {
       updateSessionsInLocalStorage(freshData);
-      initSessionsInterface(freshData);
+      await initSessionsInterface(true);
     }
-
   } catch (error) {
     alert("Ошибка при сохранении сеансов. Попробуйте позже.");
     console.error(error);
@@ -462,7 +490,7 @@ function getNewSessions() {
     .map(s => ({
       hallId: s.parentElement.dataset.id,
       filmId: s.dataset.filmid,
-      time: s.querySelector(".timeline__movie_start").textContent
+      time: s.querySelector(".timeline__movie_start").textContent,
     }));
 }
 
@@ -477,21 +505,41 @@ async function addSessionToServer(session) {
     body: params,
   });
 
-  if (!response.ok) throw new Error(`Ошибка при добавлении сеанса: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Ошибка при добавлении сеанса: ${response.status}`);
   const data = await response.json();
   console.log("Добавлен сеанс:", data);
 }
 
 async function deleteSessionFromServer(seanceId) {
-  const response = await fetch(`https://shfe-diplom.neto-server.ru/seance/${seanceId}`, {
-    method: "DELETE",
-  });
+  const response = await fetch(
+    `https://shfe-diplom.neto-server.ru/seance/${seanceId}`,
+    {
+      method: "DELETE",
+    }
+  );
 
-  if (!response.ok) throw new Error(`Ошибка при удалении сеанса: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Ошибка при удалении сеанса: ${response.status}`);
   const data = await response.json();
   console.log("Удалён сеанс:", data);
+}
+
+function updateSessionsInLocalStorage(updatedData) {
+  try {
+    localStorage.setItem(localStorageSessionsKey, JSON.stringify(updatedData));
+    console.log("LocalStorage успешно обновлён");
+  } catch (e) {
+    console.error("Ошибка обновления localStorage:", e);
+  }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   await initSessionsInterface();
 });
+// Для принудительного обновления
+async function refreshSessionsData() {
+  isInterfaceInitialized = false;
+  window.sharedAllDataPromise = null; // Сбрасываем кеш
+  await initSessionsInterface(true);
+}

@@ -11,9 +11,7 @@ const tickets = JSON.parse(localStorage.getItem("tickets") || "[]");
 async function fetchData(url) {
   try {
     const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     return await response.json();
   } catch (error) {
     console.error("Error fetching data:", error);
@@ -31,11 +29,14 @@ function parseTicketDetails(tickets) {
   const costs = [];
   tickets.forEach(ticket => {
     places.push(`${ticket.row}/${ticket.place}`);
-    const priceValue = Number(ticket.coast ?? ticket.price) || 0;
+    const rawCost = ticket.coast ?? ticket.price;
+    const normalizedCost = typeof rawCost === 'string' ? rawCost.replace(',', '.') : rawCost;
+    const priceValue = parseFloat(normalizedCost) || 0;
     costs.push(priceValue);
   });
   return { places, costs };
 }
+
 
 function updateUI(film, hall, seance, places) {
   if (!filmInfoElement || !hallInfoElement || !timeInfoElement || !placesInfoElement) {
@@ -112,7 +113,6 @@ async function initializePaymentPage() {
   const { places, costs } = parseTicketDetails(tickets);
 
   const totalCost = costs.reduce((acc, price) => acc + price, 0);
-  
 
   updateUI(currentFilm, currentHall, currentSeance, places);
   generateQRCode(
